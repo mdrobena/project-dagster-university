@@ -2,6 +2,7 @@ import dagster as dg
 from dagster_duckdb import DuckDBResource
 
 import matplotlib.pyplot as plt
+import base64
 
 from dagster_essentials.defs.assets import constants
 
@@ -13,8 +14,10 @@ class AdhocRequestConfig(dg.Config):
     end_date: str
 
 
-@dg.asset(deps=["taxi_zones", "taxi_trips"])
-def adhoc_request(config: AdhocRequestConfig, database: DuckDBResource) -> None:
+@dg.asset(group_name="requests")
+def adhoc_request(
+    config: AdhocRequestConfig, database: DuckDBResource
+) -> dg.MaterializeResult:
     """
     The response to an request made in the `requests` directory.
     See `requests/README.md` for more information.
@@ -53,10 +56,10 @@ def adhoc_request(config: AdhocRequestConfig, database: DuckDBResource) -> None:
         order by 1, 2 asc
     """
 
+    fig, ax = plt.subplots(figsize=(10, 6))
+
     with database.get_connection() as conn:
         results = conn.execute(query).fetch_df()
-
-    fig, ax = plt.subplots(figsize=(10, 6))
 
     # Pivot data for stacked bar chart
     results_pivot = results.pivot(
@@ -76,3 +79,11 @@ def adhoc_request(config: AdhocRequestConfig, database: DuckDBResource) -> None:
 
     plt.savefig(file_path)
     plt.close(fig)
+
+    with open(file_path, "rb") as file:
+        image_data = file.read()
+
+    base64_data = base64.b64encode(image_data).decode("utf-8")
+    md_content = f"![Image](data:image/jpeg;base64,{base64_data})"
+
+    return dg.MaterializeResult(metadata={"preview": dg.MetadataValue.md(md_content)})

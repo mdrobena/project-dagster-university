@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 from dagster_essentials.defs.partitions import weekly_partition
 
 
-@dg.asset(deps=["taxi_trips", "taxi_zones"])
+@dg.asset(deps=["taxi_trips", "taxi_zones"], group_name="metrics")
 def manhattan_stats(database: DuckDBResource) -> None:
     query = """
         select
@@ -41,9 +41,7 @@ def manhattan_stats(database: DuckDBResource) -> None:
         output_file.write(trips_by_zone.to_json())
 
 
-@dg.asset(
-    deps=["manhattan_stats"],
-)
+@dg.asset(deps=["manhattan_stats"], group_name="metrics")
 def manhattan_map() -> None:
     trips_by_zone = gpd.read_file(constants.MANHATTAN_STATS_FILE_PATH)
 
@@ -61,10 +59,10 @@ def manhattan_map() -> None:
     plt.close(fig)
 
 
-@dg.asset(deps=["taxi_trips"], partitions_def=weekly_partition)
+@dg.asset(deps=["taxi_trips"], partitions_def=weekly_partition, group_name="metrics")
 def trips_by_week(context: dg.AssetExecutionContext, database: DuckDBResource) -> None:
     """
-      The number of trips per week, aggregated by week.
+    The number of trips per week, aggregated by week.
     """
 
     period_to_fetch = context.partition_key
@@ -80,20 +78,29 @@ def trips_by_week(context: dg.AssetExecutionContext, database: DuckDBResource) -
     with database.get_connection() as conn:
         data_for_month = conn.execute(query).fetch_df()
 
-    aggregate = data_for_month.agg({
-        "vendor_id": "count",
-        "total_amount": "sum",
-        "trip_distance": "sum",
-        "passenger_count": "sum"
-    }).rename({"vendor_id": "num_trips"}).to_frame().T # type: ignore
+    aggregate = (
+        data_for_month.agg(
+            {
+                "vendor_id": "count",
+                "total_amount": "sum",
+                "trip_distance": "sum",
+                "passenger_count": "sum",
+            }
+        )
+        .rename({"vendor_id": "num_trips"})
+        .to_frame()
+        .T
+    )  # type: ignore
 
     # clean up the formatting of the dataframe
     aggregate["period"] = period_to_fetch
-    aggregate['num_trips'] = aggregate['num_trips'].astype(int)
-    aggregate['passenger_count'] = aggregate['passenger_count'].astype(int)
-    aggregate['total_amount'] = aggregate['total_amount'].round(2).astype(float)
-    aggregate['trip_distance'] = aggregate['trip_distance'].round(2).astype(float)
-    aggregate = aggregate[["period", "num_trips", "total_amount", "trip_distance", "passenger_count"]]
+    aggregate["num_trips"] = aggregate["num_trips"].astype(int)
+    aggregate["passenger_count"] = aggregate["passenger_count"].astype(int)
+    aggregate["total_amount"] = aggregate["total_amount"].round(2).astype(float)
+    aggregate["trip_distance"] = aggregate["trip_distance"].round(2).astype(float)
+    aggregate = aggregate[
+        ["period", "num_trips", "total_amount", "trip_distance", "passenger_count"]
+    ]
 
     try:
         # If the file already exists, append to it, but replace the existing month's data
