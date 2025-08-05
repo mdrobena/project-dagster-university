@@ -39,8 +39,10 @@ def processed_file_meta_context(
     return result
 
 
-def func_wrong_type() -> str:
+@dg.asset
+def wrong_type_annotation() -> str:
     return 2
+
 
 
 @dg.asset
