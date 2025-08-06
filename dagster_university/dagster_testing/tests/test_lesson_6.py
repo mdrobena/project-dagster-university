@@ -33,7 +33,11 @@ def file_output():
 
 # Asset Checks
 def test_non_negative():
-    pass
+    asset_check_pass = lesson_6.non_negative(10)
+    assert asset_check_pass.passed
+    asset_check_fail = lesson_6.non_negative(-10)
+    assert not asset_check_fail.passed
+
 
 
 # Jobs

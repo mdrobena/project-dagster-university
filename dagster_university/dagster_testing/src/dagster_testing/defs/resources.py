@@ -1,4 +1,5 @@
 import dagster as dg
+from dagster_snowflake import SnowflakeResource
 
 
 class StatePopulation(dg.ConfigurableResource):
@@ -17,9 +18,14 @@ class StatePopulation(dg.ConfigurableResource):
 
 @dg.definitions
 def resources():
+    """Returns Dagster resource definitions.
+
+    Returns:
+        dagster.Definitions: The resource definitions for Dagster.
+    """
     return dg.Definitions(
         resources={
-            "state_population_resource": StatePopulation(),
-            "database": dg.ResourceDefinition.mock_resource(),
+            "database": SnowflakeResource,
         },
     )
+
